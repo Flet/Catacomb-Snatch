@@ -41,5 +41,7 @@ abstract public class Buff {
 	
 	public boolean is(BuffType type) { return type == BuffType.ALL || this.buffType == type ; }
 	public boolean over() { return !this.infinite || this.charge <= 0 ;}
-	public boolean canDispell() { return this.dispell ; }
+	public boolean canDispell() {
+		return this.dispell; 
+	}
 }
