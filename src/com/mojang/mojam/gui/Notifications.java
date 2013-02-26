@@ -1,11 +1,13 @@
 package com.mojang.mojam.gui;
 
-import com.mojang.mojam.MojamComponent;
-import com.mojang.mojam.gui.components.Font;
-import com.mojang.mojam.screen.Screen;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import com.mojang.mojam.MojamComponent;
+import com.mojang.mojam.gui.components.Font;
+import com.mojang.mojam.screen.AbstractScreen;
 
 public class Notifications {
 
@@ -37,14 +39,14 @@ public class Notifications {
 		notes.add(new Note(message, life));
 	}
 
-	public void render(Screen screen) {
+	public void render(AbstractScreen screen) {
 		Iterator<Note> it = notes.iterator();
 		int i = 0;
 		while (it.hasNext()) {
 			i += 1;
 			Note note = it.next();
 			int stringWidth = Font.defaultFont().calculateStringWidth(note.message);
-			Font.defaultFont().draw(screen, note.message, (MojamComponent.GAME_WIDTH / 2) - (stringWidth / 2), MojamComponent.GAME_HEIGHT / 5 + (i * 8 * MojamComponent.SCALE));
+			Font.defaultFont().draw(screen, note.message, (MojamComponent.GAME_WIDTH / 2) - (stringWidth / 2), MojamComponent.GAME_HEIGHT / 5 + (i * 8 * MojamComponent.instance.scale));
 		}
 	}
 

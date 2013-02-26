@@ -8,7 +8,7 @@ import com.mojang.mojam.gui.components.ClickableComponent;
 import com.mojang.mojam.gui.components.Font;
 import com.mojang.mojam.resources.Constants;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Screen;
+import com.mojang.mojam.screen.AbstractScreen;
 
 public class LocaleMenu extends GuiMenu {
 
@@ -74,12 +74,12 @@ public class LocaleMenu extends GuiMenu {
 	}
 
 	@Override
-	public void render(Screen screen) {
+	public void render(AbstractScreen screen) {
 
 		if (!inGame) {
 			screen.blit(Art.background, 0, 0);
 		} else {
-			screen.alphaFill(0, 0, gameWidth, gameHeight, 0xff000000, 0x30);
+			screen.alphaFill(0, 0, gameWidth, gameHeight, 0xff000000, 0xC0);
 		}
 
 		super.render(screen);

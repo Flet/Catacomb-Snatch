@@ -10,16 +10,18 @@ import com.mojang.mojam.entity.mob.Mob;
 import com.mojang.mojam.network.TurnSynchronizer;
 import com.mojang.mojam.resources.Constants;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Bitmap;
+import com.mojang.mojam.screen.AbstractBitmap;
+
 
 public class Melee implements IWeapon {
 
 	protected Mob owner;
 	protected static float BULLET_DAMAGE;
 
-	private int upgradeIndex = 1;
+	//private int upgradeIndex = 1;
 	private double accuracy;
 	protected int shootDelay = 30;
+
 
 	private boolean readyToShoot = true;
 	private int currentShootDelay = 0;
@@ -48,7 +50,7 @@ public class Melee implements IWeapon {
 
 	@Override
 	public void upgradeWeapon() {
-		upgradeIndex++;
+		//upgradeIndex++;
 	}
 
 	@Override
@@ -132,7 +134,7 @@ public class Melee implements IWeapon {
 	}
 
 	@Override
-	public Bitmap getSprite() {
+	public AbstractBitmap getSprite() {
 		// TODO Auto-generated method stub
 		return Art.weaponList[0][1];
 	}

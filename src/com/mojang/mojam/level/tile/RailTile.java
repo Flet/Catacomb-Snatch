@@ -4,35 +4,30 @@ import com.mojang.mojam.level.Level;
 import com.mojang.mojam.math.Facing;
 import com.mojang.mojam.network.TurnSynchronizer;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Bitmap;
-import com.mojang.mojam.screen.Screen;
+import com.mojang.mojam.screen.AbstractBitmap;
+import com.mojang.mojam.screen.AbstractScreen;
 
 public class RailTile extends Tile {
 	protected static final String NAME = "RAIL";
 
 	private static final int COLOR = -1;
 
-	Tile parent;
-
 	public int numConnections = 0;
 	private boolean[] connections = new boolean[4];
 
 	// private boolean[] exits = new boolean[4];
-
-	public RailTile(Tile parent) {
-		this.parent = parent;
+	
+	public RailTile() {
 		minimapColor = Art.floorTileColors[4][1];
 	}
 
 	public void init(Level level, int x, int y) {
-		parent.init(level, x, y);
 		super.init(level, x, y);
 		neighbourChanged(null);
-		parent.neighbourChanged(null);
 	}
 
-	public void render(Screen screen) {
-		parent.render(screen);
+	public void render(AbstractScreen screen) {
+		//parent.render(screen);
 		screen.blit(Art.rails[img][0], x * Tile.WIDTH, y * Tile.HEIGHT - 6);
 	}
 
@@ -93,7 +88,7 @@ public class RailTile extends Tile {
 	}
 
 	public boolean remove() {
-		level.setTile(x, y, parent);
+		level.removeTile(x, y);
 		
 		// trigger neighbours checks
 		if ( connections[Facing.NORTH] ) ( (RailTile) level.getTile(x, y - 1) ).neighbourChanged( null );
@@ -113,7 +108,7 @@ public class RailTile extends Tile {
 	}
 
 	@Override
-	public Bitmap getBitMapForEditor() {
+	public AbstractBitmap getBitMapForEditor() {
 		return Art.rails[1][0];
 	}
 	

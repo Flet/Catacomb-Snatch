@@ -1,27 +1,23 @@
 package com.mojang.mojam.entity.weapon;
 
-import java.util.Set;
-
 import com.mojang.mojam.MojamComponent;
 import com.mojang.mojam.Options;
 import com.mojang.mojam.entity.Bullet;
 import com.mojang.mojam.entity.BulletCannonball;
 import com.mojang.mojam.entity.Entity;
 import com.mojang.mojam.entity.Player;
-import com.mojang.mojam.entity.animation.LargeBombExplodeAnimation;
 import com.mojang.mojam.entity.mob.Mob;
 import com.mojang.mojam.network.TurnSynchronizer;
 import com.mojang.mojam.resources.Constants;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Bitmap;
-import com.mojang.mojam.screen.Screen;
+import com.mojang.mojam.screen.AbstractBitmap;
 
 public class Cannon implements IWeapon {
 
 	protected Mob owner;
 	protected static float BULLET_DAMAGE;
 
-	private int upgradeIndex = 1;
+	//private int upgradeIndex = 1;
 	private double accuracy;
 	private int shootDelay = 900;
 
@@ -52,7 +48,7 @@ public class Cannon implements IWeapon {
 
 	@Override
 	public void upgradeWeapon() {
-		upgradeIndex++;
+		//upgradeIndex++;
 	}
 
 	@Override
@@ -126,7 +122,7 @@ public class Cannon implements IWeapon {
 	}
 
 	@Override
-	public Bitmap getSprite() {
+	public AbstractBitmap getSprite() {
 		// TODO Auto-generated method stub
 		return Art.weaponList[3][0];
 	}

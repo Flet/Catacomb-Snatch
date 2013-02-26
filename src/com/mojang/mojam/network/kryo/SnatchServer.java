@@ -5,8 +5,9 @@ import java.io.IOException;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
-import com.esotericsoftware.minlog.Log;
+import com.mojang.mojam.MojamComponent;
 import com.mojang.mojam.network.kryo.Network.ChatMessage;
+import com.mojang.mojam.network.kryo.Network.ConsoleMessage;
 import com.mojang.mojam.network.kryo.Network.EndGameMessage;
 import com.mojang.mojam.network.kryo.Network.RegisterName;
 import com.mojang.mojam.network.kryo.Network.StartGameCustomMessage;
@@ -17,7 +18,7 @@ public class SnatchServer {
 	Server server;
 
 	public SnatchServer() throws IOException {
-		Log.set(Log.LEVEL_DEBUG);
+		//Log.set(Log.LEVEL_DEBUG);
 		server = new Server() {
 			protected Connection newConnection() {
 				// By providing our own connection implementation, we can store
@@ -40,10 +41,28 @@ public class SnatchServer {
 				if (object instanceof RegisterName) {
 					// Ignore the object if a client has already registered a name. This is
 					// impossible with our client, but a hacker could send messages at any time.
-					if (connection.name != null) return;
+					if (connection.name != null) {
+						return;
+					}
 					// Ignore the object if the name is invalid.
 					String name = ((RegisterName)object).name;
-					if (name == null) return;
+					
+					String version = ((RegisterName)object).version;
+					if(!version.equals(MojamComponent.GAME_VERSION)) {
+						//version mismatch - send message about it and end the game
+						server.sendToTCP(connection.getID(), new ChatMessage(MojamComponent.texts.getStatic("mp.mismatch")));
+						server.sendToTCP(connection.getID(), new ChatMessage(MojamComponent.texts.getStatic("mp.server") + ": " + MojamComponent.GAME_VERSION));
+						server.sendToTCP(connection.getID(), new ChatMessage(MojamComponent.texts.getStatic("mp.client") + ": " + version));
+						
+						server.sendToTCP(connection.getID(), new EndGameMessage());
+						connection.close();
+						return;
+					}
+					
+					if (name == null) {
+						return;
+					}
+					
 					name = name.trim();
 					if (name.length() == 0) return;
 					// Store the name on the connection.
@@ -64,6 +83,13 @@ public class SnatchServer {
 					TurnMessage turnMessage = (TurnMessage) object;
 					server.sendToAllExceptTCP(connection.getID(),turnMessage);
 					//synchronizer.onTurnPacket((TurnMessage) packet);
+					return;
+				}
+				
+
+				if(object instanceof ConsoleMessage) {
+					ConsoleMessage consoleMessage = (ConsoleMessage) object;
+					server.sendToAllExceptTCP(connection.getID(),consoleMessage);
 					return;
 				}
 				
@@ -120,12 +146,6 @@ public class SnatchServer {
 	static class SnatchConnection extends Connection {
 		public String name;
 	}
-
-	public static void main(String[] args) throws IOException {
-		Log.set(Log.LEVEL_DEBUG);
-		new SnatchServer();
-	}
-
 
 	public void shutdown() {
 		server.close();

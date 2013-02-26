@@ -1,10 +1,11 @@
 package com.mojang.mojam.buff;
 
 import java.util.LinkedList;
-import com.mojang.mojam.buff.Buff;
 
 public class Buffs extends LinkedList<Buff> {
 	
+	private static final long serialVersionUID = 1L;
+
 	/* The order is FILO */
 	public boolean add(Buff buff) {
 		super.addFirst(buff); return true;

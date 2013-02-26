@@ -11,10 +11,12 @@ import com.mojang.mojam.level.LevelInformation;
 import com.mojang.mojam.level.gamemode.GameMode;
 import com.mojang.mojam.level.gamemode.GameModeVanilla;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Screen;
+import com.mojang.mojam.screen.AbstractScreen;
 
 public class TitleMenu extends GuiMenu {
 
+    	public static final int NOTHING = -0001;
+    
 	public static final int START_GAME_ID = 1000;
 	public static final int HOST_GAME_ID = 1002;
 	public static final int JOIN_GAME_ID = 1003;
@@ -50,7 +52,8 @@ public class TitleMenu extends GuiMenu {
 	public static final int MOUSE_TRAP_ID = 2007;
 	public static final int OPEN_GL_ID = 2008;
     public static final int OPEN_AL_ID = 2009;
-
+    public static final int SMALL_SCALE_ID = 2010;
+    
 	public static final int KEY_BINDINGS_ID = 3000;
 	public static final int KEY_UP_ID = 3001;
 	public static final int KEY_DOWN_ID = 3002;
@@ -94,7 +97,48 @@ public class TitleMenu extends GuiMenu {
 	public static final int LOCALE_SL_ID = 6011;
 	public static final int LOCALE_SV_ID = 6012;
 	public static final int LOCALE_AF_ID = 6013;
-
+	
+	/*
+	 * SMALL DOCUMENTATION FOR JOY_ IDS
+	 * 
+	 * 7000 - 7999 are used for joystick buttons 
+	 * 8000 is used for axis menu 
+	 * 8001 - 8998 is used for axes 
+	 * 8999 is used for joystick button menu 
+	 * 
+	 */
+	public static final int JOY_BINDINGS_ID = 7000;
+	public static final int JOY_UP_ID = 7001;
+	public static final int JOY_DOWN_ID = 7002;
+	public static final int JOY_LEFT_ID = 7003;
+	public static final int JOY_RIGHT_ID = 7004;
+	public static final int JOY_SPRINT_ID = 7005;
+	public static final int JOY_FIRE_ID = 7006;
+	public static final int JOY_USE_ID = 7007;
+	public static final int JOY_BUILD_ID = 7008;
+	public static final int JOY_UPGRADE_ID = 7009;
+	public static final int JOY_CHAT_ID = 7010;
+	public static final int JOY_FIRE_UP_ID = 7011;
+	public static final int JOY_FIRE_DOWN_ID = 7012;
+	public static final int JOY_FIRE_LEFT_ID = 7013;
+	public static final int JOY_FIRE_RIGHT_ID = 7014;
+	public static final int JOY_CYCLE_LEFT_ID = 7015;
+	public static final int JOY_CYCLE_RIGHT_ID = 7016;
+	public static final int JOY_WEAPON_SLOT_1_ID = 7017;
+	public static final int JOY_WEAPON_SLOT_2_ID = 7018;
+	public static final int JOY_WEAPON_SLOT_3_ID = 7019;
+	public static final int JOY_CLICK_ID = 7020;
+	public static final int JOY_PAUSE_ID = 7021;
+	public static final int AXES_MENU = 8000;
+	public static final int JOY_MOUSEX_ID = 8001;
+	public static final int JOY_MOUSEY_ID = 8002;
+	public static final int JOY_MOVEX_ID = 8003;
+	public static final int JOY_MOVEY_ID = 8004;
+	public static final int JOY_SHOOTX_ID = 8005;
+	public static final int JOY_SHOOTY_ID = 8006;
+	public static final int JOY_MENU= 7999;
+	
+	
 	public static LevelInformation level = null;
 	public static GameMode defaultGameMode = new GameModeVanilla();
 	public static DifficultyInformation difficulty = DifficultyInformation.NORMAL;
@@ -109,7 +153,7 @@ public class TitleMenu extends GuiMenu {
 	private Button join_host = null;
 	private Button how_to = null;
 	private Button options = null;
-	private Button lvl_editor = null;
+	//private Button lvl_editor = null;
 	private Button exit_game = null;
 
 	public TitleMenu(int gameWidth, int gameHeight) {
@@ -123,7 +167,8 @@ public class TitleMenu extends GuiMenu {
 			join_host = (Button) addButton(new Button(JOIN_GAME_ID, MojamComponent.texts.getStatic("titlemenu.join"), (gameWidth - 128) / 2, (startY += 30)));
 			how_to = (Button) addButton(new Button(HOW_TO_PLAY, MojamComponent.texts.getStatic("titlemenu.help"), (gameWidth - 128) / 2, (startY += 30)));
 			options = (Button) addButton(new Button(OPTIONS_ID, MojamComponent.texts.getStatic("titlemenu.options"), (gameWidth - 128) / 2, (startY += 30)));
-			lvl_editor = (Button) addButton(new Button(LEVEL_EDITOR_ID, MojamComponent.texts.getStatic("titlemenu.levelEditor"), (gameWidth - 128) / 2, (startY += 30)));
+			//Should be removed completely once all of the level editor code is removed. 
+			//lvl_editor = (Button) addButton(new Button(LEVEL_EDITOR_ID, MojamComponent.texts.getStatic("titlemenu.levelEditor"), (gameWidth - 128) / 2, (startY += 30)));
 			exit_game = (Button) addButton(new Button(EXIT_GAME_ID, MojamComponent.texts.getStatic("titlemenu.exit"), (gameWidth - 128) / 2, (startY += 30)));
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -131,7 +176,7 @@ public class TitleMenu extends GuiMenu {
 	}
 
 	@Override
-	public void render(Screen screen) {
+	public void render(AbstractScreen screen) {
 
 		screen.clear(0);
 		// screen.blit(Art.titles[1], 0, 10);
@@ -164,7 +209,7 @@ public class TitleMenu extends GuiMenu {
 		join_host.setLabel(MojamComponent.texts.getStatic(("titlemenu.join")));
 		how_to.setLabel(MojamComponent.texts.getStatic(("titlemenu.help")));
 		options.setLabel(MojamComponent.texts.getStatic(("titlemenu.options")));
-		lvl_editor.setLabel(MojamComponent.texts.getStatic(("titlemenu.levelEditor")));
+		//lvl_editor.setLabel(MojamComponent.texts.getStatic(("titlemenu.levelEditor")));
 		exit_game.setLabel(MojamComponent.texts.getStatic(("titlemenu.exit")));
 	}
 }

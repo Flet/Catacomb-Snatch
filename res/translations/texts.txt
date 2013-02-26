@@ -80,6 +80,11 @@ keys.weaponSlot = WEAPON SLOT {0}
 keys.cycleLeft = NEXT WEAPON
 keys.cycleRight = PREV WEAPON
 keys.console = CONSOLE
+keys.mousea = MOUSE {0}-AXIS
+keys.walka = WALK {0}-AXIS
+keys.shoota = SHOOT {0}-AXIS
+keys.click = CLICK
+keys.pause = PAUSE
 
 leveleditor.title = LEVEL EDITOR
 leveleditor.new = NEW
@@ -96,10 +101,15 @@ mp.enterIP = ENTER IP OF HOST:
 mp.localIP = YOUR LOCAL IP:
 mp.externalIP = YOUR EXTERNAL IP:
 mp.join = JOIN
+mp.mismatch = VERSION MISMATCH!
+mp.server = SERVER
+mp.client = CLIENT
 
 options.on = ON
 options.off = OFF
 options.keyBindings = KEY BINDINGS
+options.joyBindings = JOYPADS
+options.axeBindings = AXE BINDINGS
 options.characterSelect = SEL. CHARACTER
 options.trapmouse = TRAP MOUSE IN WINDOW
 options.fullscreen = FULLSCREEN
@@ -114,7 +124,9 @@ options.mute = MUTE
 options.creative = CREATIVE MODE
 options.alternative = ALTERNATIVE PLAYER SKIN
 options.credits = CREDITS
-options.openal = Sound system OpenAL
+options.openal = OPENAL (RESTART REQUIRED)
+options.smallscale = SMALL GRAPHICS
+options.enableMods = ENABLE MODS (RESTART REQUIRED)
 
 pausemenu.help = HELP
 pausemenu.backtomain = MAIN
@@ -140,6 +152,10 @@ shop.harvesterTooltipLine2 = Use to reclaim loot.
 shop.bombTooltipTitle = BOMB
 shop.bombTooltipLine1 = Destroys cracked walls.
 shop.bombTooltipLine2 = Use to create shortcuts.
+
+shop.soldierTooltipTitle = SOLDIER
+shop.soldierTooltipLine1 = Used for attack. Attacks
+shop.soldierTooltipLine2 = enemies, Collects coins.
 
 shop.rifleTooltipTitle = RIFLE
 shop.rifleTooltipLine1 = Default starting weapon.

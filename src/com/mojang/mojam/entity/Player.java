@@ -16,19 +16,19 @@ import com.mojang.mojam.entity.loot.Loot;
 import com.mojang.mojam.entity.loot.LootCollector;
 import com.mojang.mojam.entity.mob.Mob;
 import com.mojang.mojam.entity.mob.RailDroid;
-import com.mojang.mojam.entity.mob.Team;
 import com.mojang.mojam.entity.particle.Sparkle;
 import com.mojang.mojam.entity.weapon.IWeapon;
 import com.mojang.mojam.entity.weapon.Rifle;
 import com.mojang.mojam.entity.weapon.WeaponInventory;
 import com.mojang.mojam.gui.Notifications;
+import com.mojang.mojam.level.tile.PlayerRailTile;
 import com.mojang.mojam.level.tile.RailTile;
 import com.mojang.mojam.level.tile.Tile;
 import com.mojang.mojam.math.Vec2;
 import com.mojang.mojam.network.TurnSynchronizer;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Bitmap;
-import com.mojang.mojam.screen.Screen;
+import com.mojang.mojam.screen.AbstractBitmap;
+import com.mojang.mojam.screen.AbstractScreen;
 
 /**
  * Implements the player entity
@@ -53,21 +53,20 @@ public class Player extends Mob implements LootCollector {
     private boolean mouseAiming;
    
     public int takeDelay = 0;
-    public int flashTime = 0;
     public int suckRadius = 0;
     public boolean wasShooting;
     public int score = 0;
     private int facing = 0;
     private int time = 0;
     private int walkTime = 0;
-    private Building selected = null;
+    private Entity selected = null;
     static final int RailDelayTicks = 15;
     private int lastRailTick = -999;
     private final static int INTERACT_DISTANCE = 20 * 20; // Sqr
     private int steps = 0;
     private boolean isSeeing;
-    private int startX;
-    private int startY;
+    //private int startX;
+    //private int startY;
     public int muzzleTicks = 0;
     public double muzzleX = 0;
     public double muzzleY = 0;
@@ -99,8 +98,8 @@ public class Player extends Mob implements LootCollector {
         this.mouseButtons = mouseButtons;
         this.character = character;
 
-        startX = x;
-        startY = y;
+        //startX = x;
+        //startY = y;
 
         plevel = 0; // will be displayed in GUI as lev 1
         pexp = 0;
@@ -178,13 +177,12 @@ public class Player extends Mob implements LootCollector {
     
     @Override
     public void tick() {
-
         // If the mouse is used, update player orientation before level tick
         if (!mouseButtons.mouseHidden) {
             // Update player mouse, in world pixels relative to player
             setAimByMouse(
-                    (mouseButtons.getX() - (MojamComponent.screen.w / 2)),
-                    ((mouseButtons.getY() + 24) - (MojamComponent.screen.h / 2)));
+                    (mouseButtons.getX() - (MojamComponent.screen.getWidth() / 2)),
+                    ((mouseButtons.getY() + 24) - (MojamComponent.screen.getHeight() / 2)));
         } else {
             setAimByKeyboard();
         }
@@ -288,13 +286,10 @@ public class Player extends Mob implements LootCollector {
         if (keys.build.isDown && !keys.build.wasDown) {
             handleRailBuilding(x, y);
         }
-
-        if (carrying != null) {
-            handleCarrying();
-        } else {
-            handleEntityInteraction();
-        }
-
+        
+        handleCarrying();
+        handleEntityInteraction();
+        
         if (isSeeing) {
             level.reveal(x, y, 5);
         }
@@ -313,16 +308,9 @@ public class Player extends Mob implements LootCollector {
     /**
      * Count down the internal timers
      */
-    private void countdownTimers() {
-        if (flashTime > 0) {
-            flashTime = 0;
-        }
-        if (hurtTime > 0) {
-            hurtTime--;
-        }
-        if (freezeTime > 0) {
-            freezeTime--;
-        }
+    protected void countdownTimers() {
+    	super.countdownTimers();
+    	
         if (muzzleTicks > 0) {
             muzzleTicks--;
         }
@@ -513,31 +501,32 @@ public class Player extends Mob implements LootCollector {
      * @param y current position's Y coordinate
      */
     private void handleRailBuilding(int x, int y) {
-    	boolean outsideLevel = y < 8 || y > level.height - 9;
-        if (level.getTile(x, y).isBuildable()) {
-        	
-            if (score >= COST_RAIL && time - lastRailTick >= RailDelayTicks && !outsideLevel) {
+    	Tile tile = level.getTile(x, y);
+    	
+        if (tile.isBuildable()) {
+            if (score >= COST_RAIL && time - lastRailTick >= RailDelayTicks) {
                 lastRailTick = time;
-                level.placeTile(x, y, new RailTile(level.getTile(x, y)), this);
+                level.placeTile(x, y, new RailTile(), this);
                 payCost(COST_RAIL);
             } else if (score < COST_RAIL && this.team == MojamComponent.localTeam) {
             	Notifications.getInstance().add(MojamComponent.texts.buildRail(COST_RAIL));
             }            
-        } else if (level.getTile(x, y) instanceof RailTile) {
-            if ((y < 8 && team == Team.Team2) || (y > level.height - 9 && team == Team.Team1)) {
-                if (score >= COST_DROID) {
-                    level.addEntity(new RailDroid(pos.x, pos.y, team));
-                    payCost(COST_DROID);
-                } else {
-                	if(this.team == MojamComponent.localTeam) {
-                		Notifications.getInstance().add(MojamComponent.texts.buildDroid(COST_DROID));
-                	}
-                }
+        } else if (tile instanceof RailTile) {
+            if (tile instanceof PlayerRailTile) {
+            	if ( ((PlayerRailTile) tile).isTeam(team)) {
+	                if (score >= COST_DROID) {
+	                    level.addEntity(new RailDroid(pos.x, pos.y, team));
+	                    payCost(COST_DROID);
+	                } else {
+	                	if(this.team == MojamComponent.localTeam) {
+	                		Notifications.getInstance().add(MojamComponent.texts.buildDroid(COST_DROID));
+	                	}
+	                }
+            	}
             } else {
-
                 if (score >= COST_REMOVE_RAIL && time - lastRailTick >= RailDelayTicks) {
                     lastRailTick = time;
-                    if (((RailTile) level.getTile(x, y)).remove()) {
+                    if (((RailTile) tile).remove()) {
                         payCost(COST_REMOVE_RAIL);
                     }
                 } else if (score < COST_REMOVE_RAIL) {
@@ -555,15 +544,42 @@ public class Player extends Mob implements LootCollector {
      */
     private void handleCarrying() {
 
-        carrying.setPos(pos.x, pos.y - 20);
-        carrying.tick();
         if (keys.use.wasPressed() || mouseButtons.isDown(mouseUseButton)) {
             mouseButtons.setNextState(mouseUseButton, false);
 
-            if (((IUsable) carrying).isAllowedToCancel()) {
-                drop();
+            if(selected != null) {
+            	if (selected instanceof ICarrySwap) {
+            		carrying=((ICarrySwap)selected).tryToSwap(carrying);
+            		if (carrying != null) {
+            			carrying.onPickup(this);
+            		}
+            	}
+            } else {
+            	if (!isCarrying())
+            		return;
+            	
+            	if (carrying.isAllowedToCancel()) {
+            		drop();
+            	}
             }
         }
+        
+    	if (!isCarrying())
+    		return;
+    	
+        carrying.setPos(pos.x, pos.y - 20);
+        carrying.tick();
+    }
+    
+    public void pickup(Building b) {
+    	if(isCarrying()) {
+    		if(carrying.isAllowedToCancel()) {
+    			drop();
+    		} else {
+    			return;
+    		}
+    	}
+    	super.pickup(b);
     }
 
     /**
@@ -571,75 +587,80 @@ public class Player extends Mob implements LootCollector {
      */
     private void handleEntityInteraction() {
         // Unhighlight previously selected building
-        if (selected != null) {
-            selected.setHighlighted(false);
+    	if (selected != null && selected instanceof IUsable) {
+    		((IUsable)selected).setHighlighted(false);
             selected = null;
         }
 
-        // Find the closest Building within interation
+        // Find the closest Entity within interaction
         // distance
-        Building closest = null;
+        Entity closest = null;
         double closestDist = Double.MAX_VALUE;
-        for (Entity e : level.getEntitiesSlower(pos.x - INTERACT_DISTANCE, pos.y - INTERACT_DISTANCE, pos.x + INTERACT_DISTANCE, pos.y + INTERACT_DISTANCE, Building.class)) {
-            Building b = (Building)e;
+        for (Entity e : level.getEntitiesSlower(pos.x - INTERACT_DISTANCE, pos.y - INTERACT_DISTANCE, pos.x + INTERACT_DISTANCE, pos.y + INTERACT_DISTANCE, Mob.class)) {
             double dist = e.pos.distSqr(getInteractPosition());
-            if (dist <= INTERACT_DISTANCE && dist < closestDist) {
+            if (dist <= INTERACT_DISTANCE && dist < closestDist && e instanceof IUsable) {
                 closestDist = dist;
-                closest = b;
+                closest = e;
             }
         }
 
-        // If we found a building close enough to interact with...
+        // If we found a entity close enough to interact with...
         if (closest != null) {
             // Perform any allowed interactions if the correct
             // keys have been pressed
             if (keys.use.wasPressed() || mouseButtons.isDown(mouseUseButton)) {
 
-                if (canUseBuilding(closest)) {
-                    closest.use(this);
+                if (canUseEntity(closest)) {
+                	((IUsable)closest).use(this);
                     mouseButtons.setNextState(mouseUseButton, false);
                 }
             } else if (keys.upgrade.wasPressed()) {
                 
-                if (canUpgradeBuilding(closest)) {
-                    closest.upgrade(this);
+                if (canUpgradeEntity(closest)) {
+                	((IUsable)closest).upgrade(this);
                 }
             }
-            
-            // If it is a building we should highlight on this game
-            // client, then highlight the building (also, remember the
-            // highlighted building, so we can unhighlight it again later)
-            if (shouldHighlightBuildingOnThisGameClient(closest)) {
+
+			/**
+			 * If it is a building we should highlight on this game
+			 * client, then highlight the building (also, remember the
+			 * highlighted building, so we can unhighlight it again later)
+			 */
+            if (shouldHighlightEntity(closest)) {
                 selected = closest;
-                selected.setHighlighted(true);
+                ((IUsable)selected).setHighlighted(true);
             }
         }
     }
-    
-    // Whether this Player should see the building in question
-    // highlighted on their game client - this indicates that
-    // they can interact with the building
-    private boolean shouldHighlightBuildingOnThisGameClient(Building building) {
-        return building.isHighlightable() && canInteractWithBuilding(building) && this.team == MojamComponent.localTeam; 
+  
+    /**
+     *  Whether this Player should highlight the entity in question, Multi player safe.
+     * @param entity the entity this player is trying to highlight
+     * @return true if this player can highlight the given entity
+     */
+    private boolean shouldHighlightEntity(Entity entity) {
+    	if (!(entity instanceof IUsable))
+    		return false;
+    	return ((IUsable)entity).isHighlightable() && canInteractWithEntity(entity);// && this.team == entity.team; 
     }
     
-    // Whether this Player is allowed to use the building in 
+    // Whether this Player is allowed to use the Entity in 
     // question
-    private boolean canUseBuilding(Building building) {
+    private boolean canUseEntity(Entity entity) {
         //return building.team == this.team || building.team == Team.Neutral; // Players can only use their own and neutral buildings
-        return !(building instanceof ShopItem && building.team != this.team); // Players can only use their own shops, but can use any other building regardless of ownership
+    	return !(entity instanceof ShopItem && entity.team != this.team); // Players can only use their own shops, but can use any other building regardless of ownership
     }
     
-    // Whether this Player is allowed to upgrade the building
+    // Whether this Player is allowed to upgrade the Entity
     // in question
-    private boolean canUpgradeBuilding(Building building) {
-        return building.team == this.team; // Players can only upgrade their own buildings
+    private boolean canUpgradeEntity(Entity entity) {
+    	return entity.team == this.team; // Players can only upgrade their own Entities
     }
     
-    // Whether this Player is allowed to interact with the building in 
+    // Whether this Player is allowed to interact with the Entity in 
     // question
-    private boolean canInteractWithBuilding(Building building) {
-        return canUseBuilding(building) || canUpgradeBuilding(building);
+    private boolean canInteractWithEntity(Entity entity) {
+    	return canUseEntity(entity) || canUpgradeEntity(entity);
     }
 
     /**
@@ -688,8 +709,8 @@ public class Player extends Mob implements LootCollector {
     }
 
     @Override
-    public void render(Screen screen) {
-		Bitmap[][] sheet = Art.getPlayer(getCharacter());
+    public void render(AbstractScreen screen) {
+		AbstractBitmap[][] sheet = Art.getPlayer(getCharacter());
     	
 		if(sheet == null){
 			return;
@@ -714,7 +735,7 @@ public class Player extends Mob implements LootCollector {
 
         if (hurtTime % 2 != 0) {
             screen.colorBlit(sheet[frame][facing], pos.x - Tile.WIDTH / 2, pos.y - Tile.HEIGHT / 2 - 8, 0x80ff0000);
-        } else if (flashTime > 0) {
+        } else if (getFlashTime() > 0) {
             screen.colorBlit(sheet[frame][facing], pos.x - Tile.WIDTH / 2, pos.y - Tile.HEIGHT / 2 - 8, 0x80ffff80);
         } else {
             screen.blit(sheet[frame][facing], pos.x - Tile.WIDTH / 2, pos.y - Tile.HEIGHT / 2 - 8);
@@ -727,7 +748,7 @@ public class Player extends Mob implements LootCollector {
         addSprintBar(screen);
 	}
     
-    private void addSprintBar(Screen screen) {
+    private void addSprintBar(AbstractScreen screen) {
     	if (this.timeSprint <= 0) { 
     		return; 
     	}
@@ -744,13 +765,13 @@ public class Player extends Mob implements LootCollector {
     }
 
 	@Override
-	public void renderTop(Screen screen) {
+	public void renderTop(AbstractScreen screen) {
 		int frame = (walkTime / 4 % 6 + 6) % 6;
 		renderCarrying(screen, (frame == 0 || frame == 3) ? -1 : 0);
 	}
     
     @Override
-    protected void renderCarrying(Screen screen, int yOffs) {
+    protected void renderCarrying(AbstractScreen screen, int yOffs) {
     	if(carrying != null && carrying.team == MojamComponent.localTeam ) {
 			if(carrying instanceof Turret) {
 				Turret turret = (Turret)carrying;
@@ -790,7 +811,7 @@ public class Player extends Mob implements LootCollector {
 
     @Override
     public void flash() {
-        flashTime = 20;
+        setFlashTime(5);
     }
 
     @Override
@@ -803,7 +824,7 @@ public class Player extends Mob implements LootCollector {
     }
     
     @Override
-    public Bitmap getSprite() {
+    public AbstractBitmap getSprite() {
         return null;
     }
 
@@ -883,7 +904,8 @@ public class Player extends Mob implements LootCollector {
         Notifications.getInstance().add(MojamComponent.texts.hasDiedCharacter(getCharacter()));
         carrying = null;
         dropAllMoney();
-        pos.set(startX, startY);
+        Vec2 randomSpawnPoint = level.getRandomSpawnPoint(team);
+        pos.set(randomSpawnPoint.x, randomSpawnPoint.y);
         health = maxHealth;
     }
 
@@ -926,6 +948,14 @@ public class Player extends Mob implements LootCollector {
     public void updateFacing() {
         facing = (int) ((Math.atan2(-aimVector.x, aimVector.y) * 8 / (Math.PI * 2) + 8.5)) & 7;
     }
+
+	public int getPlevel() {
+		return plevel;
+	}
+
+	public void setPlevel(int plevel) {
+		this.plevel = plevel;
+	}
 
 
 

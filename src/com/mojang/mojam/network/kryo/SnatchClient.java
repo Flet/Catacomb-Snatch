@@ -18,6 +18,7 @@ import com.mojang.mojam.network.kryo.Network.ChangeMouseButtonMessage;
 import com.mojang.mojam.network.kryo.Network.ChangeMouseCoordinateMessage;
 import com.mojang.mojam.network.kryo.Network.CharacterMessage;
 import com.mojang.mojam.network.kryo.Network.ChatMessage;
+import com.mojang.mojam.network.kryo.Network.ConsoleMessage;
 import com.mojang.mojam.network.kryo.Network.EndGameMessage;
 import com.mojang.mojam.network.kryo.Network.PauseMessage;
 import com.mojang.mojam.network.kryo.Network.RegisterName;
@@ -44,6 +45,7 @@ public class SnatchClient {
 			public void connected (Connection connection) {
 				RegisterName registerName = new RegisterName();
 				registerName.name = "USER"+Math.random();
+				registerName.version = MojamComponent.GAME_VERSION;
 				client.sendTCP(registerName);
 				client.updateReturnTripTime();
 			}
@@ -71,16 +73,12 @@ public class SnatchClient {
 
 	}
 
-	public void connectLocal() {
+	public void connectLocal() throws IOException {
 		connect("localhost", Network.port);
 	}
-	
-	public void connect(String host, int port) {
-		try {
-			client.connect(5000,host, port);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+
+	public void connect(String host, int port) throws IOException {
+		client.connect(5000, host, port);
 	}
 
 	public void tick() {
@@ -103,12 +101,13 @@ public class SnatchClient {
 		if (message instanceof TurnMessage) {
 			mojamComponent.synchronizer.onTurnMessage((TurnMessage) message);
 		} else if (message instanceof RegisterName) {
-			RegisterName registerNamemessage = (RegisterName) message;
+			//RegisterName registerNamemessage = (RegisterName) message;
 			mojamComponent.createServerState = 1;
 			return;
 		} else if (message instanceof ChangeKeyMessage) {
 			ChangeKeyMessage ckc = (ChangeKeyMessage) message;
-			mojamComponent.synchedKeys[playerId].getAll().get(ckc.key).nextState = ckc.nextState;
+			if (ckc.key < mojamComponent.synchedKeys[playerId].getAll().size())
+				mojamComponent.synchedKeys[playerId].getAll().get(ckc.key).nextState = ckc.nextState;
 		} else if (message instanceof ChangeMouseButtonMessage) {
 			ChangeMouseButtonMessage ckc = (ChangeMouseButtonMessage) message;
 			mojamComponent.synchedMouseButtons[playerId].nextState[ckc.button] = ckc.nextState;
@@ -125,13 +124,11 @@ public class SnatchClient {
 			mojamComponent.players[charMessage.localId].setCharacter(GameCharacter.values()[charMessage.ordinal]);
 		} else if (message instanceof PauseMessage) {
 			PauseMessage pm = (PauseMessage) message;
-			mojamComponent.paused = pm.paused;
-			if (pm.paused) {
-				mojamComponent.menuStack.add(new PauseMenu(MojamComponent.GAME_WIDTH, MojamComponent.GAME_HEIGHT));
-			} else {
-				mojamComponent.menuStack.pop();
-			}
-		} else if (message instanceof StartGameMessage) {
+			mojamComponent.pause(pm.paused);
+		} else if (message instanceof ConsoleMessage) {
+			ConsoleMessage cm = (ConsoleMessage) message;
+			mojamComponent.console.processInputFromNetwork(cm.message);
+	    } else if (message instanceof StartGameMessage) {
 			if (!mojamComponent.isServer) {
 				mojamComponent.sendCharacter = true;
 				StartGameMessage sgMessage = (StartGameMessage) message;

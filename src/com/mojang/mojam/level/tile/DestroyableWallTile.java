@@ -8,8 +8,8 @@ import com.mojang.mojam.entity.animation.TileExplodeAnimation;
 import com.mojang.mojam.level.Level;
 import com.mojang.mojam.math.BB;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Bitmap;
-import com.mojang.mojam.screen.Screen;
+import com.mojang.mojam.screen.AbstractBitmap;
+import com.mojang.mojam.screen.AbstractScreen;
 
 public class DestroyableWallTile extends WallTile {
 	static final int WALLHEIGHT = 56;
@@ -32,12 +32,12 @@ public class DestroyableWallTile extends WallTile {
 				* Tile.WIDTH, (y + 1) * Tile.HEIGHT));
 	}
 
-	public void render(Screen screen) {
+	public void render(AbstractScreen screen) {
 		screen.blit(Art.treasureTiles[4][0], x * Tile.WIDTH, y * Tile.HEIGHT
 				- (WALLHEIGHT - Tile.HEIGHT));
 	}
 
-	public void renderTop(Screen screen) {
+	public void renderTop(AbstractScreen screen) {
 		screen.blit(Art.treasureTiles[4][0], x * Tile.WIDTH, y * Tile.HEIGHT
 				- (WALLHEIGHT - Tile.HEIGHT), 32, 32);
 	}
@@ -51,13 +51,13 @@ public class DestroyableWallTile extends WallTile {
 	}
 
 	public void bomb(LargeBombExplodeAnimation largeBombExplodeAnimation) {
-		level.setTile(x, y, new FloorTile());
+		level.removeTile(x, y);
 		level.addEntity(new TileExplodeAnimation((x + 0.5) * Tile.WIDTH,
 				(y + 0.5) * Tile.HEIGHT));
 	}
 	
 	@Override
-	public Bitmap getBitMapForEditor() {
+	public AbstractBitmap getBitMapForEditor() {
 		return  Art.treasureTiles[4][0];
 	}
 	

@@ -60,6 +60,7 @@ help.rails = TRILHOS
 help.rails1 = O TRANSPORTE DOS DROIDS COLETORES.
 help.rails2 = PRESSIONE 'CONSTRUIR' NO PRIMEIRO TRILHO
 help.rails3 = PARA CONSTRUIR UM DROID COLETOR(50 GOLD).
+help.rails4 =
 
 keys.up = CIMA
 keys.down = BAIXO
@@ -95,6 +96,9 @@ mp.enterIP = COLOCAR IP DO HOSPEDEIRO:
 mp.localIP = SEU IP LOCAL:
 mp.externalIP = SEU IP EXTERNO:
 mp.join = ENTRAR
+mp.mismatch = VERSÕES DIFERENTES!
+mp.server = SERVIDOR
+mp.client = CLIENTE
 
 options.on = LIGADO
 options.off = DESLIGADO
@@ -113,6 +117,9 @@ options.mute = SEM SOM
 options.creative = MODO CRIATIVO
 options.alternative = SKIN ALTERNATIVA
 options.credits = CRÉDITOS
+options.openal = SISTEMA DE SOM OpenAL
+options.smallscale = GRÁFICOS PEQUENOS
+options.enableMods = ATIVAR MODS (NECESSÁRIO RESETAR)
 
 pausemenu.help = AJUDA
 pausemenu.backtomain = MENU
@@ -130,24 +137,28 @@ player.level = {0}
 player.weaponSlot = {0}
 
 shop.turretTooltipTitle = TURRET
-shop.turretTooltipLine1 = USADA PARA DEFESA.
-shop.turretTooltipLine2 = ATACA INIMIGOS PRÓXIMOS.
+shop.turretTooltipLine1 = Usada para defesa.
+shop.turretTooltipLine2 = Ataca inimigos próximos.
 shop.harvesterTooltipTitle = COLETOR
-shop.harvesterTooltipLine1 = PEGA TESOUROS.
-shop.harvesterTooltipLine2 = USE-O PARA PEGAR DINHEIRO.
+shop.harvesterTooltipLine1 = Pega tesouros.
+shop.harvesterTooltipLine2 = Use-o para pegar dinheiro.
 shop.bombTooltipTitle = BOMB
-shop.bombTooltipLine1 = DESTRÓI PAREDES RACHADAS.
-shop.bombTooltipLine2 = USE PARA CRIAR ATALHOS.
+shop.bombTooltipLine1 = Destrói paredes rachadas.
+shop.bombTooltipLine2 = Use para criar atalhos.
+
+shop.soldierTooltipTitle = SOLDADO
+shop.soldierTooltipLine1 = Usado para atacar,ataca
+shop.soldierTooltipLine2 = enemigos, coleta moedas.
 
 shop.rifleTooltipTitle = RIFLE
-shop.rifleTooltipLine1 = ARMA INICIA
-shop.rifleTooltipLine2 = EQUILIBRADA
+shop.rifleTooltipLine1 = Arma inicia
+shop.rifleTooltipLine2 = Equilibrada
 shop.shotgunTooltipTitle = ESPINGARDA
-shop.shotgunTooltipLine1 = TIROS COBREM UMA GRANDE ÁREA 
-shop.shotgunTooltipLine2 = DANO ALTO,ALCANCE BAIXO
+shop.shotgunTooltipLine1 = Tiros cobrem uma grande área 
+shop.shotgunTooltipLine2 = Dano alto,alcance baixo
 shop.raygunTooltipTitle = ARMA DE ENERGIA
-shop.raygunTooltipLine1 = TIROS RICOCHETEIAM NA PAREDE.
-shop.raygunTooltipLine2 = CADA RICOCHETE AUMENTA O DANO.
+shop.raygunTooltipLine1 = Tiros ricocheteiam na parede.
+shop.raygunTooltipLine2 = Cada ricochete aumenta o dano.
 
 titlemenu.start = JOGAR
 titlemenu.host = HOST

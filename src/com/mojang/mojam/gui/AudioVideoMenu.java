@@ -13,14 +13,16 @@ import com.mojang.mojam.gui.components.ClickableComponent;
 import com.mojang.mojam.gui.components.Font;
 import com.mojang.mojam.gui.components.Slider;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Screen;
+import com.mojang.mojam.screen.AbstractScreen;
 import com.mojang.mojam.sound.ISoundPlayer;
 
 public class AudioVideoMenu extends GuiMenu {
 	private boolean fullscreen;
+	private boolean useSmallScale;
 	private boolean opengl;
 	private boolean trapMouse;
 	private boolean fps;
+	private boolean enableMods;
 	private float musicVolume;
 	private float soundsVolume;
 	private float volume;
@@ -33,9 +35,11 @@ public class AudioVideoMenu extends GuiMenu {
 
 	private ClickableComponent back;
 	private ClickableComponent fullscreenBtn;
+	private ClickableComponent smallScale;
 	private ClickableComponent openGlBtn;
 	private ClickableComponent trapMouseBtn;
 	private ClickableComponent fpsBtn;
+	private ClickableComponent enableModsBtn;
 	private ClickableComponent soundVol;
 	private ClickableComponent musicVol;
 	private ClickableComponent soundsVol;
@@ -51,10 +55,18 @@ public class AudioVideoMenu extends GuiMenu {
 		gameHeight = MojamComponent.GAME_HEIGHT;
 		int offset = 32;
 		int xOffset = (gameWidth - Button.BUTTON_WIDTH) / 2;
-		int yOffset = (gameHeight - (7 * offset + 20 + (offset * 2))) / 2;
+		int yOffset = (gameHeight - (11 * offset + 20 + (offset * 2))) / 2;
 		textY = yOffset;
 		yOffset += offset;
 
+		useSmallScale =  Options.getAsInteger(Options.SCALE,2)<2;
+		
+		smallScale = addButton(
+				new Checkbox(TitleMenu.SMALL_SCALE_ID,
+					MojamComponent.texts.getStatic("options.smallscale"), xOffset,
+					yOffset += offset,useSmallScale )
+			);
+		
 		fullscreenBtn = addButton(
 					new Checkbox(TitleMenu.FULLSCREEN_ID,
 						MojamComponent.texts.getStatic("options.fullscreen"), xOffset,
@@ -79,6 +91,12 @@ public class AudioVideoMenu extends GuiMenu {
 						yOffset += offset, Options.getAsBoolean(Options.DRAW_FPS,
 						Options.VALUE_FALSE))
 				);
+		enableModsBtn = addButton(
+				new Checkbox(TitleMenu.FPS_ID,
+					MojamComponent.texts.getStatic("options.enableMods"), xOffset,
+					yOffset += offset, Options.getAsBoolean(Options.ENABLE_MODS,
+					Options.VALUE_FALSE))
+			);
         soundOpenALBtn = addButton(
                     new Checkbox(TitleMenu.OPEN_AL_ID,
                         MojamComponent.texts.getStatic("options.openal"), xOffset,
@@ -105,6 +123,26 @@ public class AudioVideoMenu extends GuiMenu {
 							xOffset, (yOffset += offset) + 20)
 				);
 
+        smallScale.addListener(new ButtonListener() {
+			@Override
+			public void buttonPressed(ClickableComponent button) {
+				useSmallScale = !useSmallScale;
+				Options.set(Options.SCALE, useSmallScale ? 1 : 2);		
+				
+				if(useSmallScale) {
+					MojamComponent.instance.setScale(1);
+				} else {
+					MojamComponent.instance.setScale(2);
+				}
+				
+
+			}
+
+			@Override
+			public void buttonHovered(ClickableComponent clickableComponent) {
+			}
+		});
+		
         fullscreenBtn.addListener(new ButtonListener() {
 			@Override
 			public void buttonPressed(ClickableComponent button) {
@@ -145,6 +183,17 @@ public class AudioVideoMenu extends GuiMenu {
 			public void buttonPressed(ClickableComponent button) {
 				fps = !fps;
 				Options.set(Options.DRAW_FPS, fps);
+			}
+
+			@Override
+			public void buttonHovered(ClickableComponent clickableComponent) {
+			}
+		});
+		enableModsBtn.addListener(new ButtonListener() {
+			@Override
+			public void buttonPressed(ClickableComponent button) {
+				enableMods = !enableMods;
+				Options.set(Options.ENABLE_MODS, enableMods);
 			}
 
 			@Override
@@ -223,6 +272,7 @@ public class AudioVideoMenu extends GuiMenu {
 		trapMouse = Options.getAsBoolean(Options.TRAP_MOUSE, Options.VALUE_FALSE);
 		opengl = Options.getAsBoolean(Options.OPENGL, Options.VALUE_FALSE);
 		fps = Options.getAsBoolean(Options.DRAW_FPS, Options.VALUE_FALSE);
+		enableMods = Options.getAsBoolean(Options.ENABLE_MODS, Options.VALUE_FALSE);
         openAL = Options.getAsBoolean(Options.OPEN_AL, Options.VALUE_TRUE);
 		musicVolume = Options.getAsFloat(Options.MUSIC, "1.0f");
 		soundsVolume = Options.getAsFloat(Options.SOUND, "1.0f");
@@ -230,12 +280,12 @@ public class AudioVideoMenu extends GuiMenu {
 	}
 
 	@Override
-	public void render(Screen screen) {
+	public void render(AbstractScreen screen) {
 
 		if (!inGame) {
 			screen.blit(Art.background, 0, 0);
 		} else {
-			screen.alphaFill(0, 0, gameWidth, gameHeight, 0xff000000, 0x30);
+			screen.alphaFill(0, 0, gameWidth, gameHeight, 0xff000000, 0xC0);
 		}
 
 		super.render(screen);

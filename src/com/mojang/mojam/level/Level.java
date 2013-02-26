@@ -2,6 +2,7 @@ package com.mojang.mojam.level;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -11,6 +12,7 @@ import com.mojang.mojam.MojamComponent;
 import com.mojang.mojam.entity.Entity;
 import com.mojang.mojam.entity.Player;
 import com.mojang.mojam.entity.mob.Mob;
+import com.mojang.mojam.entity.mob.Team;
 import com.mojang.mojam.entity.predicates.EntityIntersectsBB;
 import com.mojang.mojam.entity.predicates.EntityIntersectsBBAndInstanceOf;
 import com.mojang.mojam.gui.Notifications;
@@ -18,30 +20,34 @@ import com.mojang.mojam.gui.TitleMenu;
 import com.mojang.mojam.gui.components.Font;
 import com.mojang.mojam.level.gamemode.ILevelTickItem;
 import com.mojang.mojam.level.gamemode.IVictoryConditions;
+import com.mojang.mojam.level.tile.AnimatedTile;
 import com.mojang.mojam.level.tile.FloorTile;
 import com.mojang.mojam.level.tile.Tile;
-import com.mojang.mojam.level.tile.AnimatedTile;
 import com.mojang.mojam.level.tile.WallTile;
 import com.mojang.mojam.math.BB;
 import com.mojang.mojam.math.BBPredicate;
 import com.mojang.mojam.math.Vec2;
+import com.mojang.mojam.mod.ModSystem;
+import com.mojang.mojam.network.TurnSynchronizer;
+import com.mojang.mojam.screen.AbstractBitmap;
+import com.mojang.mojam.screen.AbstractScreen;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Bitmap;
-import com.mojang.mojam.screen.Screen;
 
 public class Level {
-	public int TARGET_SCORE = 100;
 
-	public final int width, height;
-
-	public Tile[] tiles;
-	public List<Entity>[] entityMap;
-	public List<Entity> entities = new ArrayList<Entity>();
-	private Bitmap minimap;
+	private LinkedList<Tile>[] tiles;
+	private List<Vec2> spawnPointsP1;
+	private List<Vec2> spawnPointsP2;
+	private AbstractBitmap minimap;
 	private boolean largeMap = false, smallMap = false;
 	private boolean seen[];
+
 	final int[] neighbourOffsets;
 
+	public int TARGET_SCORE = 100;
+	public final int width, height;
+	public List<Entity>[] entityMap;
+	public List<Entity> entities = new ArrayList<Entity>();
 	public List<ILevelTickItem> tickItems = new ArrayList<ILevelTickItem>();;
 	public int maxMonsters;
 	
@@ -55,31 +61,36 @@ public class Level {
 
 	@SuppressWarnings("unchecked")
 	public Level(int width, int height) {
-		neighbourOffsets = new int[] { -1, 1, -width, width };
+		neighbourOffsets = new int[] { -1, 1, -width, -width + 1, -width - 1, width, width + 1, width - 1};
 		this.width = width;
 		this.height = height;
 		
 		int denseTileArrayWidth;
 		int denseTileArrayHeight;
-		if(width % 3 == 0)
+		if (width % 3 == 0) {
 			denseTileArrayWidth = width/densityTileWidth;
-		else
+		} else {
 			denseTileArrayWidth = width/densityTileWidth+1;
+		}
 		
-		if(height % 3 == 0)
+		if (height % 3 == 0) {
 			denseTileArrayHeight = height/densityTileHeight;
-		else
+		} else {
 			denseTileArrayHeight = height/densityTileHeight+1;
+		}
 		
 		monsterDensity = new int[denseTileArrayWidth][denseTileArrayHeight];
 
-		minimap = new Bitmap(width, height);
+		minimap = MojamComponent.screen.createBitmap(width, height);
 		
 		largeMap = height > 64 || width > 64;
 		smallMap = height < 64 && width < 64;
 		
-		initializeTiles();
+		initializeTileMap();
 
+		spawnPointsP1 = new ArrayList<Vec2>();
+		spawnPointsP2 = new ArrayList<Vec2>();
+		
 		entityMap = new List[width * height];
 		for (int i = 0; i < width * height; i++) {
 			entityMap[i] = new ArrayList<Entity>();
@@ -88,43 +99,118 @@ public class Level {
 		setSeen(new boolean[(width + 1) * (height + 1)]);
 	}
 
-	private void initializeTiles(){
-	    tiles = new Tile[width * height];
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                Tile tile = new FloorTile();
-                setTile(x, y, tile);
-            }
-        }
-	}
-
-	public void setTile(int x, int y, Tile tile) {
-		final int index = x + (y * width);
-		tiles[index] = tile;
-		tile.init(this, x, y);
-		for (int of : neighbourOffsets) {
-			final int nbIndex = index + of;
-			if (nbIndex >= 0 && nbIndex < width * height) {
-				final Tile neighbour = tiles[nbIndex];
-				if (neighbour != null)
-					neighbour.neighbourChanged(tile);
+	@SuppressWarnings("unchecked")
+	private void initializeTileMap() {
+		tiles = new LinkedList[width * height];
+		
+		//All of the lists need to be setup before adding the tiles
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				tiles[x + y * width] = new LinkedList<Tile>();
 			}
 		}
-		if(tile instanceof AnimatedTile) { 
+		//Each list will contain a floor tile
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				setTile(x, y, new FloorTile());
+			}
+		}
+	}	
+
+	/**
+	 * Changes the current active tile at xy to the given tile
+	 * and updates the surrounding tiles
+	 * 
+	 * @param x
+	 * @param y
+	 * @param tile
+	 */
+	public void setTile(int x, int y, Tile tile) {
+		tiles[x + y * width].addLast(tile);
+		tile.init(this, x, y);		
+
+		updateTiles(x, y, tile);
+		
+		if (tile instanceof AnimatedTile) { 
 			tickItems.add((ILevelTickItem) tile);
 		}
 	}
 
 	public Tile getTile(int x, int y) {
-		if (x < 0 || y < 0 || x >= width || y >= height)
+		if (x < 0 || y < 0 || x >= width || y >= height) {
 			return null;
-		return tiles[x + y * width];
+		}
+		return tiles[x + y * width].peekLast();
 	}
 
 	public Tile getTile(Vec2 pos) {
 		int x = (int) pos.x / Tile.WIDTH;
 		int y = (int) pos.y / Tile.HEIGHT;
 		return getTile(x, y);
+	}
+	
+	
+	public void removeTile(int x, int y) {
+		int index = x + y * width;
+		if ( tiles[index].size() > 1) {
+			tiles[index].removeLast();
+			updateTiles(x, y, tiles[index].peekLast());
+		}
+		
+		
+	}
+	
+	private void updateTiles(int x, int y, Tile tile) {
+		for (int offset : neighbourOffsets) {
+			final int nbIndex = x + (y * width) + offset;
+			if (nbIndex >= 0 && nbIndex < width * height) {
+				final Tile neighbour = tiles[nbIndex].peekLast();
+				if (neighbour != null) {
+					neighbour.neighbourChanged(tile);
+				}				
+			}
+		}
+	}
+	
+	/**
+	 * Add a player spawn point for the given team
+	 * 
+	 * @param x
+	 * @param y
+	 * @param team
+	 */
+	
+	public void addSpawnPoint(int x, int y, int team) {
+		if (team == Team.Team1) {
+			spawnPointsP1.add(new Vec2(x, y));
+		} else if (team == Team.Team2) {
+			spawnPointsP2.add(new Vec2(x, y));
+		} else {
+			return;
+		}
+		
+	}
+	
+	public Vec2 getRandomSpawnPoint(int team) {
+		int index;
+		if (team == Team.Team1) {
+			index = TurnSynchronizer.synchedRandom.nextInt(spawnPointsP1.size() - 1);
+			return spawnPointsP1.get(index);
+		} else if (team == Team.Team2) {
+			index = TurnSynchronizer.synchedRandom.nextInt(spawnPointsP2.size() - 1);
+			return spawnPointsP2.get(index);
+		} else {
+			return null;
+		}
+	}
+	
+	/**
+	 * Checks that there are spawn points for all players
+	 * @return true if all players can spawn
+	 */
+	
+	public boolean canPlayerSpawn() {
+		return !spawnPointsP1.isEmpty() && !spawnPointsP2.isEmpty();
 	}
 
 	public void insertToEntityMap(Entity e) {
@@ -150,11 +236,13 @@ public class Level {
 		int y1 = e.yto + (int) (e.radius.y * 2 + 1) / Tile.HEIGHT;
 
 		for (int y = e.yto; y <= y1; y++) {
-			if (y < 0 || y >= height)
+			if (y < 0 || y >= height) {
 				continue;
+			}
 			for (int x = e.xto; x <= x1; x++) {
-				if (x < 0 || x >= width)
+				if (x < 0 || x >= width) {
 					continue;
+				}
 				entityMap[x + y * width].remove(e);
 			}
 		}
@@ -223,8 +311,7 @@ public class Level {
 	public void addMob(Mob m, int xTile, int yTile)
 	{
 		updateDensityList();
-		if(monsterDensity[(int)(xTile/densityTileWidth)][(int)(yTile/densityTileHeight)] < TitleMenu.difficulty.getAllowedMobDensity())
-		{
+		if(monsterDensity[(int)(xTile/densityTileWidth)][(int)(yTile/densityTileHeight)] < TitleMenu.difficulty.getAllowedMobDensity()) {
 			addEntity(m);
 		}
 	}
@@ -267,9 +354,11 @@ public class Level {
 				removeFromEntityMap(e);
 			}
 		}
-		if(victoryConditions != null)
+		if(victoryConditions != null) {
 			victoryConditions.updateVictoryConditions(this);
+		}
 		Notifications.getInstance().tick();
+		ModSystem.levelTick(this);
 	}
 
 	private boolean hasSeen(int x, int y) {
@@ -278,23 +367,25 @@ public class Level {
 				|| getSeen()[(x + 1) + (y + 1) * (width + 1)];
 	}
 
-	public void render(Screen screen, int xScroll, int yScroll) {
+	public void render(AbstractScreen screen, int xScroll, int yScroll) {
 		int x0 = xScroll / Tile.WIDTH;
 		int y0 = yScroll / Tile.HEIGHT;
-		int x1 = (xScroll + screen.w) / Tile.WIDTH;
-		int y1 = (yScroll + screen.h) / Tile.HEIGHT;
-		if (xScroll < 0)
+		int x1 = (xScroll + screen.getWidth()) / Tile.WIDTH;
+		int y1 = (yScroll + screen.getHeight()) / Tile.HEIGHT;
+		if (xScroll < 0) {
 			x0--;
-		if (yScroll < 0)
+		}
+		if (yScroll < 0) {
 			y0--;
+		}
 
 		Set<Entity> visibleEntities = getEntities(xScroll - Tile.WIDTH, yScroll
-				- Tile.HEIGHT, xScroll + screen.w + Tile.WIDTH, yScroll
-				+ screen.h + Tile.HEIGHT);
+				- Tile.HEIGHT, xScroll + screen.getWidth() + Tile.WIDTH, yScroll
+				+ screen.getHeight() + Tile.HEIGHT);
 
 		screen.setOffset(-xScroll, -yScroll);
 
-		renderTilesAndBases(screen, x0, y0, x1, y1);
+		renderTiles(screen, x0, y0, x1, y1);
 
 		for (Entity e : visibleEntities) {
 			e.render(screen);
@@ -314,57 +405,22 @@ public class Level {
 		Notifications.getInstance().render(screen);
 	}
 
-	private void renderTilesAndBases(Screen screen, int x0, int y0, int x1, int y1){
+	private void renderTiles(AbstractScreen screen, int x0, int y0, int x1, int y1){
 	    // go through each currently visible cell
 	    for (int y = y0; y <= y1; y++) {
 	        for (int x = x0; x <= x1; x++) {
 
 	            // draw sand outside the level
 	            if (x < 0 || x >= width || y < 0 || y >= height) {
-	                screen.blit(Art.floorTiles[5][0], x * Tile.WIDTH, y
-	                        * Tile.HEIGHT);
-	                continue;
-	            }
-
-	            Bitmap[][] playerBaseZero = Art.getPlayerBase(getPlayerCharacter(0));
-	            Bitmap[][] playerBaseOne = Art.getPlayerBase(getPlayerCharacter(1));
-	            int baseOneTileHeight = playerBaseOne[0].length;
-	            int baseOneTileWidth = playerBaseOne.length;
-	            int baseZeroTileHeight = playerBaseZero[0].length;
-	            int baseZeroTileWidth = playerBaseZero.length;
-	            
-	            
-	            // if we are in the center area (4*7 Tiles): draw player bases
-				int xt = x - (width / 2) + ((baseOneTileWidth-(baseOneTileWidth%2))/2) + (baseOneTileWidth%2);
-				int yt = y - baseOneTileHeight;
-
-	            if (xt >= 0 && yt >= 0 && xt < baseOneTileWidth && yt < baseOneTileHeight && (isNotBaseRailTile(x) || yt < baseOneTileHeight-1)) {
-	                screen.blit(playerBaseOne[xt][yt], x * Tile.WIDTH, y
-	                        * Tile.HEIGHT);
-	                continue;
-	            }
-	            
-	            // if we are in the center area (4*7 Tiles): draw player bases
-				xt = x - (width / 2) + ((baseZeroTileWidth-(baseZeroTileWidth%2))/2) + (baseZeroTileWidth%2);
-				
-				
-	            yt = y - (height - 8);
-	            if (xt >= 0 && yt >= 0 && xt < baseZeroTileWidth && yt < baseZeroTileHeight && (isNotBaseRailTile(x) || yt > 0)) {       
-					screen.blit(playerBaseZero[xt][yt], x * Tile.WIDTH, y * Tile.HEIGHT);
-	                if (yt == 0 && ((xt <=(baseZeroTileWidth-3)/2) || (xt >=((baseZeroTileWidth-3)/2)+3 ))) {
-	                    screen.blit(Art.shadow_north, x * Tile.WIDTH, y * Tile.HEIGHT);
-	                }
-	                if ((xt == 2) && yt == 0) {
-	                    screen.blit(Art.shadow_north_west, x * Tile.WIDTH, y * Tile.HEIGHT);
-	                }
-	                if ((xt == 4) && yt == 0) {
-	                    screen.blit(Art.shadow_north_east, x * Tile.WIDTH + Tile.WIDTH - Art.shadow_east.w, y * Tile.HEIGHT);
-	                }
+	                screen.blit(Art.floorTiles[5][0], x * Tile.WIDTH, y * Tile.HEIGHT);
 	                continue;
 	            }
 
 	            if (canSee(x, y)) {
-	                tiles[x + y * width].render(screen);
+	                for(int i = 0; i < tiles[x + y * width].size(); i++) {
+	                	tiles[x + y * width].get(i).render(screen);
+	                }
+	                
 	            }
 	        }
 	    }
@@ -372,102 +428,123 @@ public class Level {
 
 	private GameCharacter getPlayerCharacter(int playerID){
 	    Player player = MojamComponent.instance.players[playerID];
-	    if (player == null) return GameCharacter.None;
-	    else return player.getCharacter();
+	    if (player == null) {
+	    	return GameCharacter.None;
+	    } else {
+	    	return player.getCharacter();
+	    }
 	}
-	
-	private boolean isNotBaseRailTile(int x){
-	    return (x < (width/2 - 2) || x > (width/2));
-	}
-	
 
-	private void renderTopOfWalls(Screen screen, int x0, int y0, int x1, int y1){
+	private void renderTopOfWalls(AbstractScreen screen, int x0, int y0, int x1, int y1){
 	    for (int y = y0; y <= y1; y++) {
             for (int x = x0; x <= x1; x++) {
                 if (x < 0 || x >= width || y < 0 || y >= height) {
                     continue;
                 }
-                if (canSee(x, y)) {
-                    tiles[x + y * width].renderTop(screen);
-                }
+	            if (canSee(x, y)) {
+	                for (int i = 0; i < tiles[x + y * width].size(); i++) {
+	                	tiles[x + y * width].get(i).renderTop(screen);
+	                }
+	            }
             }
         }
 	}
 	
-	private void renderDarkness(Screen screen, int x0, int y0, int x1, int y1){
+	private void renderDarkness(AbstractScreen screen, int x0, int y0, int x1, int y1){
 	    for (int y = y0; y <= y1; y++) {
-            if (y < 0 || y >= height)
-                continue;
+            if (y < 0 || y >= height) {
+            	continue;
+            }
             for (int x = x0; x <= x1; x++) {
-                if (x < 0 || x >= width)
-                    continue;
+                if (x < 0 || x >= width) {
+                	continue;
+                }
                 boolean c0 = !getSeen()[x + y * (width + 1)];
                 boolean c1 = !getSeen()[(x + 1) + y * (width + 1)];
                 boolean c2 = !getSeen()[x + (y + 1) * (width + 1)];
                 boolean c3 = !getSeen()[(x + 1) + (y + 1) * (width + 1)];
 
-                if (!(c0 || c1 || c2 || c3))
-                    continue;
+                if (!(c0 || c1 || c2 || c3)) {
+                	continue;
+                }
 
                 int count = 0;
-                if (c0)
-                    count++;
-                if (c1)
-                    count++;
-                if (c2)
-                    count++;
-                if (c3)
-                    count++;
+                if (c0) {
+                	count++;
+                }
+                if (c1) {
+                	count++;
+                }
+                if (c2) {
+                	count++;
+                }
+                if (c3) {
+                	count++;
+                }
                 int yo = -16;
 
                 if (count == 4) {
                     screen.blit(Art.darkness[1][1], x * Tile.WIDTH, y
                             * Tile.WIDTH + yo);
                 } else if (count == 3) {
-                    if (!c0)
+                    if (!c0) {
                         screen.blit(Art.darkness[1][4], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (!c1)
+                    }
+                    if (!c1) {
                         screen.blit(Art.darkness[0][4], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (!c2)
+                    }
+                    if (!c2) {
                         screen.blit(Art.darkness[1][3], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (!c3)
+                    }
+                    if (!c3) {
                         screen.blit(Art.darkness[0][3], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
+                    }
                 } else if (count == 1) {
-                    if (c0)
+                    if (c0) {
                         screen.blit(Art.darkness[2][2], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (c1)
+                    }
+                    if (c1) {
                         screen.blit(Art.darkness[0][2], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (c2)
+                    }
+                    if (c2) {
                         screen.blit(Art.darkness[2][0], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (c3)
+                    }
+                    if (c3) {
                         screen.blit(Art.darkness[0][0], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
+                    }
                 } else {
-                    if (c0 && c3)
+                    if (c0 && c3) {
                         screen.blit(Art.darkness[2][4], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (c1 && c2)
+                    }
+                    if (c1 && c2) {
                         screen.blit(Art.darkness[2][3], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (c0 && c1)
+                    }
+                    if (c0 && c1) {
                         screen.blit(Art.darkness[1][2], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (c2 && c3)
+                    }
+                    if (c2 && c3) {
                         screen.blit(Art.darkness[1][0], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (c0 && c2)
+                    }
+                    if (c0 && c2) {
                         screen.blit(Art.darkness[2][1], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
-                    if (c1 && c3)
+                    }
+                    if (c1 && c3) {
                         screen.blit(Art.darkness[0][1], x * Tile.WIDTH, y
                                 * Tile.WIDTH + yo);
+                    }
                 }
             }
         }
@@ -478,9 +555,9 @@ public class Level {
             for (int x = 0; x < width; x++) {
                 int i = x + y * width;
                 if (hasSeen(x, y)) {
-                    minimap.pixels[i] = tiles[i].minimapColor;
+                    minimap.setPixel(i, getTile(x, y).minimapColor);
                 } else {
-                    minimap.pixels[i] = 0xff000000;
+                    minimap.setPixel(i, 0xff000000);
                 }
             }
         }
@@ -497,8 +574,7 @@ public class Level {
                     int y = (int) (e.pos.y / Tile.WIDTH);
                     if (x >= 0 && y >= 0 && x < width && y < height) {
                         if (hasSeen(x, y)) {
-                            minimap.blit(
-                                    Art.mapIcons[e.minimapIcon % 4][e.minimapIcon / 4],
+                            minimap.blit(Art.mapIcons[e.minimapIcon % 4][e.minimapIcon / 4],
                                     x - 2, y - 2);
                         }
                     }
@@ -507,24 +583,24 @@ public class Level {
         }
     }
 	
-	private void renderPanelAndMinimap(Screen screen, int x0, int y0){
-	    Bitmap displaymap = new Bitmap(64, 64);
+	private void renderPanelAndMinimap(AbstractScreen screen, int x0, int y0){
+	    AbstractBitmap displaymap = screen.createBitmap(64, 64);
 	    
-	    if(largeMap){
+	    if (largeMap) {
             displaymap = calculateLargeMapDisplay(x0, y0);
-        } else if(smallMap){
+        } else if (smallMap) {
             displaymap = calculateSmallMapDisplay();
         } else {
             displaymap = minimap;
         }
         
-        screen.blit(Art.panel, 0, screen.h - 80);
-        screen.blit(displaymap, 429, screen.h - 80 + 5);
+        screen.blit(Art.panel, 0, screen.getHeight() - 80);
+        screen.blit(displaymap, 429, screen.getHeight() - 80 + 5);
 	}
 	
-	private Bitmap calculateLargeMapDisplay(int x0, int y0) {
+	private AbstractBitmap calculateLargeMapDisplay(int x0, int y0) {
 	    
-	    Bitmap largeMap = new Bitmap(64, 64);
+	    AbstractBitmap largeMap = MojamComponent.screen.createBitmap(64, 64);
 	    int locx = x0 + 8;
         int locy = y0 + 8;
         
@@ -532,20 +608,24 @@ public class Level {
         int donex = 0, doney = 0;
         int diffx = 0, diffy = 0;
         
-        if(width < 64) diffx = (64 - width) / 2;
-        if(height < 64) diffy = (64 - height) / 2;
+        if (width < 64) {
+        	diffx = (64 - width) / 2;
+        }
+        if (height < 64) {
+        	diffy = (64 - height) / 2;
+        }
         
-        if(locx < 32 || width < 64){
+        if (locx < 32 || width < 64) {
             drawx = 0;
-        } else if(locx > (width - 32)){
+        } else if (locx > (width - 32)) {
             drawx = width - 64;
-        } else{
+        } else {
             drawx = locx - 32;
         }
         
-        if(locy < 32 || height < 64){
+        if (locy < 32 || height < 64) {
             drawy = 0;
-        } else if(locy > (height - 32)){
+        } else if (locy > (height - 32)) {
             drawy = height - 64;
         } else {
             drawy = locy - 32;
@@ -554,17 +634,19 @@ public class Level {
         for (int y = 0; y < 64; y++) {
             if(y < diffy || y >= (64 - diffy)) {
                 for (int x = 0; x < 64; x++) {
-                    largeMap.pixels[x + (y * 64)] = Art.floorTileColors[5 & 7][5 / 8];
+                    largeMap.setPixel(x + (y * 64), Art.floorTileColors[5 & 7][5 / 8]);
                 }
             }
             else{
                 for (int x = 0; x < 64; x++) {
-                    if(x < diffx || x > (64 - diffx)) 
-                        largeMap.pixels[x + (y * 64)] = Art.floorTileColors[5 & 7][5 / 8];
-                    else{
-                        if(((drawx + donex) + (drawy + doney) * width) < minimap.pixels.length -1) 
-                            largeMap.pixels[x + (y * 64)] = minimap.pixels[(drawx + donex) + (drawy + doney) * width];
-                            donex++;
+                    if (x < diffx || x > (64 - diffx)) {
+                        largeMap.setPixel(x + (y * 64), Art.floorTileColors[5 & 7][5 / 8]);
+                    }
+                    else {
+                        if (((drawx + donex) + (drawy + doney) * width) < minimap.getPixelSize() -1) {
+                        	largeMap.setPixel(x + (y * 64), minimap.getPixel((drawx + donex) + (drawy + doney) * width));
+                        }
+                        donex++;
                     }
                 }
                 donex = 0;
@@ -575,42 +657,44 @@ public class Level {
         return largeMap;
 	}
 	
-	private Bitmap calculateSmallMapDisplay() {
+	private AbstractBitmap calculateSmallMapDisplay() {
 	    
-	    Bitmap smallMap = new Bitmap(64, 64);
+	    AbstractBitmap smallMap = MojamComponent.screen.createBitmap(64, 64);
         int smallx = 0, smally = 0;
         for (int y = 0; y < 64; y++) {
             for (int x = 0; x < 64; x++) {
-                if(x >= (32 - width/2) && x <= (32 + width/2) && y >= (32 - height/2) && y < (32 + height/2) - 1){
-                    smallMap.pixels[x + y * 64] = minimap.pixels[smallx + smally * width];
+                if (x >= (32 - width/2) && x <= (32 + width/2) && y >= (32 - height/2) && y < (32 + height/2) - 1) {
+                    smallMap.setPixel(x + y * 64, minimap.getPixel(smallx + smally * width));
                     smallx++;
                 }
                 else
-                    smallMap.pixels[x + y * 64] = Art.floorTileColors[5 & 7][5 / 8];
+                    smallMap.setPixel(x + y * 64, Art.floorTileColors[5 & 7][5 / 8]);
             }
             smallx = 0;
             
-            if(y >= (32 - height/2) && y < (32 + height/2) - 1)
+            if (y >= (32 - height/2) && y < (32 + height/2) - 1) {
                 smally++;
+            }
         }
         return smallMap;
 	}
 	
-	private void renderPlayerScores(Screen screen){
+	private void renderPlayerScores(AbstractScreen screen){
 	    
 	    String player1score =  MojamComponent.texts.scoreCharacter(getPlayerCharacter(0), player1Score * 100 / TARGET_SCORE);
-        Font.defaultFont().draw(screen, player1score, 280-player1score.length()*10, screen.h - 20); //adjust so it fits in the box
-        screen.blit(Art.getPlayer(getPlayerCharacter(0))[0][2], 262, screen.h-42);
+        Font.defaultFont().draw(screen, player1score, 280-player1score.length()*10, screen.getHeight() - 20); //adjust so it fits in the box
+        screen.blit(Art.getPlayer(getPlayerCharacter(0))[0][2], 262, screen.getHeight()-42);
 
         if (MojamComponent.instance.players[1] != null && getPlayerCharacter(1) != GameCharacter.None) {
-            Font.defaultFont().draw(screen, MojamComponent.texts.scoreCharacter(getPlayerCharacter(1), player2Score * 100 / TARGET_SCORE), 56, screen.h - 36);
-            screen.blit(Art.getPlayer(getPlayerCharacter(1))[0][6], 19, screen.h-42);
+            Font.defaultFont().draw(screen, MojamComponent.texts.scoreCharacter(getPlayerCharacter(1), player2Score * 100 / TARGET_SCORE), 56, screen.getHeight() - 36);
+            screen.blit(Art.getPlayer(getPlayerCharacter(1))[0][6], 19, screen.getHeight()-42);
         }
 	}
 	
 	private boolean canSee(int x, int y) {
-		if (x < 0 || y < 1 || x >= width || y >= height)
+		if (x < 0 || y < 1 || x >= width || y >= height) {
 			return true;
+		}
 		return getSeen()[x + (y - 1) * (width + 1)]
 				|| getSeen()[(x + 1) + (y - 1) * (width + 1)]
 				|| getSeen()[x + y * (width + 1)] || getSeen()[(x + 1) + y * (width + 1)]
@@ -639,9 +723,10 @@ public class Level {
 				continue;
 			}
 			for (int x = x0; x <= x1; x++) {
-				if (x < 0 || x >= width)
+				if (x < 0 || x >= width) {
 					continue;
-				tiles[x + y * width].addClipBBs(result, e);
+				}
+				getTile(x, y).addClipBBs(result, e);
 			}
 		}
 
@@ -668,15 +753,18 @@ public class Level {
 		for (int i = 0; i <= radius; i++) {
 			int xx = x0 + (x1 - x0) * i / radius;
 			int yy = y0 + (y1 - y0) * i / radius;
-			if (xx < 0 || yy < 0 || xx >= width || yy >= height)
+			if (xx < 0 || yy < 0 || xx >= width || yy >= height) {
 				return;
+			}
 			int xd = xx - x0;
 			int yd = yy - y0;
-			if (xd * xd + yd * yd > radius * radius)
+			if (xd * xd + yd * yd > radius * radius) {
 				return;
+			}
 			Tile tile = getTile(xx, yy);
-			if (tile instanceof WallTile)
+			if (tile instanceof WallTile) {
 				return;
+			}
 			getSeen()[xx + yy * (width + 1)] = true;
 			getSeen()[(xx + 1) + yy * (width + 1)] = true;
 			getSeen()[xx + (yy + 1) * (width + 1)] = true;
@@ -685,9 +773,9 @@ public class Level {
 	}
 
 	public void placeTile(int x, int y, Tile tile, Player player) {
-		if (!getTile(x, y).isBuildable())
+		if (!getTile(x, y).isBuildable()) {
 			return;
-
+		}
 		if (player != null) {
 			setTile(x, y, tile);
 		}
@@ -710,5 +798,113 @@ public class Level {
 
 	public void setSeen(boolean seen[]) {
 		this.seen = seen;
+	}
+
+	public boolean checkLineOfSight(Entity eSource, Entity eTarget) {
+	
+		return checkLineOfSight(eSource, eTarget.pos);
+	}
+	/**
+	 * simple quick line drawing algorithm based off Bresenham's line algorithm
+	 *  {@link http://en.wikipedia.org/wiki/Bresenham's_line_algorithm#Simplification}
+	 *  
+	 *Plot moved out for the usual position to account for seeing though diagonal walls
+	 * [ ] = Empty, [E] = eSource, [T] = vTarget, [X] = Wall,
+	 * [.] = Line Plot, [Z] = Plot collision with wall
+	 * 
+	 * Original following Bresenham's line algorithm, which allows 'viewing' through walls
+	 * 
+	 * [E][ ][ ][X][ ][ ]
+	 * [ ][.][ ][X][ ][ ]
+	 * [ ][ ][.][X][ ][ ]
+	 * [ ][ ][X][.][ ][ ]
+	 * [ ][ ][X][ ][.][ ]
+	 * [ ][ ][X][ ][ ][T]
+	 * 
+	 * Modified version used here, notice the double thick line.
+	 * 
+	 * [E][.][ ][X][ ][ ]
+	 * [ ][.][.][X][ ][ ]
+	 * [ ][ ][.][Z][ ][ ]
+	 * [ ][ ][X][ ][ ][ ]
+	 * [ ][ ][X][ ][ ][ ]
+	 * [ ][ ][X][ ][ ][T]
+	 *  
+	 * TODO: currently uses Entity.canPass() which is for Walking NOT seeing
+	 * 			Need to add a method Entity.canSee() or something.
+	 * 
+	 * @param eSource the source Entity ie this entity wants to see...
+	 * @param vTarget the target the eSource is looking at
+	 * @return boolean true if eSource can see vTarget
+	 */
+	public boolean checkLineOfSight(Entity eSource, Vec2 vTarget) {
+		Vec2 tP;
+		tP = getTileFromPosition(eSource.pos);
+		int x1 = (int) tP.x;
+		int y1 = (int) tP.y;
+	
+		tP = getTileFromPosition(vTarget);
+		int x2 = (int) tP.x;
+		int y2 = (int) tP.y;
+	
+		if (x1 >= width || x1 <= 0 || x2 >= width || x2 <= 0 || y1 >= height
+				|| y1 <= 0 || y2 >= height || y2 <= 0) {
+			return false;
+		}
+		int dx = Math.abs(x2 - x1);
+		int dy = Math.abs(y2 - y1);
+		int sx = -1;
+		int sy = -1;
+	
+		if (x1 < x2)
+			sx = 1;
+		if (y1 < y2)
+			sy = 1;
+	
+		int dff = dx - dy;
+		int d2;
+		
+		if (!getTile(x1, y1).canPass(eSource))
+			return false;
+	
+		do {
+			if (x1 == x2 && y1 == y2)
+				break;
+			d2 = 2 * dff;
+			if (d2 > -dy) {
+				dff -= dy;
+				x1 += sx;
+				if (!getTile(x1, y1).canPass(eSource))
+					return false;
+			}
+			if (d2 < dx) {
+				dff += dx;
+				y1 += sy;
+				if (!getTile(x1, y1).canPass(eSource))
+					return false;
+			}
+		} while (true);
+	
+		return true;
+	}
+
+	/**
+	 * @param pos The World Space position of the tile you want. 
+	 * @return Position of the Tile in Tile Space
+	 */
+	public Vec2 getTileFromPosition(Vec2 pos) {
+		int x = (int) pos.x / Tile.WIDTH;
+		int y = (int) pos.y / Tile.HEIGHT;
+		return new Vec2(x, y);
+	}
+
+	/**
+	 * @param x The x-coordinate of the Tile in Tile Space
+	 * @param y The y-coordinate of the Tile in Tile Space
+	 * @return Position of the tile in World Space
+	 */
+	public Vec2 getPositionFromTile(int x, int y) {
+		return new Vec2(x * Tile.WIDTH + (Tile.WIDTH / 2), y * Tile.HEIGHT
+				+ (Tile.HEIGHT / 2));
 	}
 }

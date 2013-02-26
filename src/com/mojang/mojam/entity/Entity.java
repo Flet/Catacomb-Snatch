@@ -9,7 +9,7 @@ import com.mojang.mojam.math.BB;
 import com.mojang.mojam.math.BBOwner;
 import com.mojang.mojam.math.Vec2;
 import com.mojang.mojam.screen.Art;
-import com.mojang.mojam.screen.Screen;
+import com.mojang.mojam.screen.AbstractScreen;
 
 public abstract class Entity implements BBOwner {
 
@@ -27,6 +27,8 @@ public abstract class Entity implements BBOwner {
 	public int minimapIcon = -1;
 	public int minimapColor = -1;
 	public int team;
+	
+	private Entity spawnSource;
 
 	public void setPos(double x, double y) {
 		pos.set(x, y);
@@ -60,11 +62,11 @@ public abstract class Entity implements BBOwner {
 		return new BB(this, pos.x - radius.x, pos.y - radius.y, pos.x + radius.x, pos.y + radius.y);
 	}
 
-	public void render(Screen screen) {
+	public void render(AbstractScreen screen) {
 		screen.blit(Art.floorTiles[3][0], pos.x - Tile.WIDTH / 2, pos.y - Tile.HEIGHT / 2 - 8);
 	}
 	
-	public void renderTop(Screen screen) {
+	public void renderTop(AbstractScreen screen) {
 	}
 	
 	protected boolean move(double xa, double ya) {
@@ -163,6 +165,9 @@ public abstract class Entity implements BBOwner {
 
 	public void remove() {
 		removed = true;
+		if (spawnSource != null && spawnSource instanceof IRemoveEntityNotify) {
+			((IRemoveEntityNotify)spawnSource).removeEntityNotice(this);
+		}
 	}
 
 	@Override
@@ -180,5 +185,13 @@ public abstract class Entity implements BBOwner {
 	}
 
 	public void bomb(LargeBombExplodeAnimation largeBombExplodeAnimation) {
+	}
+
+	public Entity getSpawnSource() {
+		return spawnSource;
+	}
+
+	public void setSpawnSource(Entity spawnSource) {
+		this.spawnSource = spawnSource;
 	}
 }
